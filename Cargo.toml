@@ -1,0 +1,11 @@
+[package]
+name = "orbital_calc"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sgp4 = "2.2.0"
+plotters = "0.3.7"
+chrono = "0.4.38"
+minifb = "=0.27.0"
+plotters-bitmap = "0.3.7"

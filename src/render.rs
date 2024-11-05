@@ -1,6 +1,6 @@
-use full_palette::{BLUE, GREY};
+use full_palette::{GREY, ORANGE};
 use sgp4::{Constants, Elements};
-use plotters::{chart::ChartState, coord::{ranged3d::Cartesian3d, types::RangedCoordf64}, prelude::*};
+use plotters::{chart::ChartState, coord::{ranged3d::Cartesian3d, types::RangedCoordf64}, prelude::*, style::BLUE};
 use minifb::{Key, Window, WindowOptions};
 use std::borrow::{Borrow, BorrowMut};
 use plotters_bitmap::bitmap_pixel::BGRXPixel;
@@ -63,7 +63,7 @@ pub fn render(elements: Vec<Elements>) -> Result<(), Box<dyn std::error::Error>>
             .margin(10)
             .x_label_area_size(30)
             .y_label_area_size(30)
-            .build_cartesian_3d(-7000.0..7000.0, -7000.0..7000.0, -7000.0..7000.0)?;
+            .build_cartesian_3d(-10000.0..10000.0, -10000.0..10000.0, -10000.0..10000.0)?;
 
         chart.configure_axes()
             .x_formatter(&|x| format!("x={x}"))
@@ -88,22 +88,20 @@ fn array_to_tuple(array: [f64; 3]) -> (f64, f64, f64) {
 }
 
 fn render_plot(window: &mut Window, elements: Vec<Elements>, buf: &mut BufferWrapper, cs: &ChartState<Cartesian3d<RangedCoordf64, RangedCoordf64, RangedCoordf64>>) -> Result<(), Box<dyn std::error::Error>>{
-    let mut min: f64 = 0.0;
-
     while window.is_open() && !window.is_key_down(Key::Escape) {
         {
-            let mut data_vec: Vec<Vec<(f64, f64, f64)>> = Vec::new();
+            let now = chrono::Utc::now().naive_utc();
+            let mut data_vec: Vec<(f64, f64, f64)> = Vec::new();
             elements.iter().for_each(|e| {
+                let dt = now - e.datetime;
                 let constants = Constants::from_elements(&e).unwrap();
-                let mut data: Vec<(f64, f64, f64)> = Vec::new();
-                for i in 0..10 {
-                    let position = constants.propagate(sgp4::MinutesSinceEpoch(min + i as f64 * 0.1)).unwrap().position;
-                    data.push(array_to_tuple(position));
-                }
-                data_vec.push(data);
+                let position = constants.propagate(sgp4::MinutesSinceEpoch(dt.num_seconds() as f64 / 60.0)).unwrap().position;
+                data_vec.push(array_to_tuple(position));
             });
 
             let root = BitMapBackend::<BGRXPixel>::with_buffer_and_format(buf.borrow_mut(),(WIDTH as u32, HEIGHT as u32),)?.into_drawing_area();
+            root.fill(&GREY).unwrap();
+            root.draw(&Text::new(format!("{}", now.format("%Y/%m/%d %H:%M:%S")), (100, 20), ("sans-serif", 40)))?;
 
             let mut chart = cs.clone().restore(&root);
             chart.plotting_area().fill(&GREY)?;
@@ -112,15 +110,15 @@ fn render_plot(window: &mut Window, elements: Vec<Elements>, buf: &mut BufferWra
                 .y_formatter(&|y| format!("y={y}"))
                 .z_formatter(&|z| format!("z={z}"))
                 .draw()?;
-            chart.plotting_area().draw(&Circle::new((0_f64, 0_f64, 0_f64), 290, BLUE.filled()))?;
+            //chart.plotting_area().draw(&Circle::new((0_f64, 0_f64, 0_f64), 210, BLUE.filled()))?;
+            //chart.draw_series(LineSeries::new(line_vec.clone(), &ORANGE)).unwrap();
 
             data_vec.iter().try_for_each(|d| -> Result<(), Box<dyn std::error::Error>>{
-                chart.plotting_area().draw(&Circle::new(d[d.len()-1], 1, RED.filled()))?;
+                chart.plotting_area().draw(&Circle::new(*d, 1, RED.filled()))?;
                 Ok(())
             })?;
             root.present()?;
 
-            min += 0.5;
         }
 
         window.update_with_buffer(buf.borrow_mut(), WIDTH, HEIGHT)?;
@@ -128,3 +126,4 @@ fn render_plot(window: &mut Window, elements: Vec<Elements>, buf: &mut BufferWra
     }
     Ok(())
 }
+
